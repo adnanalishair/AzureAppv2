@@ -1,0 +1,47 @@
+name: Deploy .NET App to Azure
+
+on:
+  workflow_dispatch:  # Allow manual triggering from GitHub UI
+  push:
+    branches:
+      - master  # Runs when code is pushed to master branch
+
+env:
+  AZURE_WEBAPP_NAME: AzureAppServiceLearning  # Your Azure App Service Name
+  DOTNET_VERSION: '8.x'  # Change if using a different .NET version
+  SOLUTION_PATH: 'AzureAppV2.sln'  # Solution file
+  API_PROJECT_PATH: 'AzureAppV2/AzureAppV2.csproj'  # Ensure this points to your .csproj
+  PUBLISH_DIR: '${{ github.workspace }}/publish'  # Absolute path for published files
+
+jobs:
+  build-and-deploy:
+    name: Build and Deploy
+    runs-on: windows-latest  # Use Windows runner
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: ${{ env.DOTNET_VERSION }}
+
+      - name: Restore Dependencies
+        run: dotnet restore ${{ env.SOLUTION_PATH }}
+
+      - name: Build Project
+        run: dotnet build ${{ env.SOLUTION_PATH }} --configuration Release --no-restore
+
+      - name: Run Tests
+        run: dotnet test ${{ env.SOLUTION_PATH }} --configuration Release --no-restore --no-build --verbosity normal
+
+      - name: Publish Project
+        run: dotnet publish ${{ env.API_PROJECT_PATH }} --configuration Release --no-restore --no-build -o ${{ env.PUBLISH_DIR }}
+
+      - name: Deploy to Azure App Service
+        uses: azure/webapps-deploy@v2
+        with:
+          app-name: ${{ env.AZURE_WEBAPP_NAME }}
+          publish-profile: ${{ secrets.AZURE_WEBAPP_PUBLISH_PROFILE }}  # Store in GitHub Secrets
+          package: ${{ env.PUBLISH_DIR }}
